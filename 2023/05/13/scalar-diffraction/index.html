@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+      <link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css" rel="stylesheet" type="text/css">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+    <title>Scalar diffraction python tutorial</title>
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 5.4.2"></head>
+  <body>
+    <main class="container">
+      <header class="header">
+    <div class="blog-title">
+        <h1><a href="/">Sleepingcat</a></h1>
+        <p class="description">Hello World</p>
+    </div>
+    <nav class="navbar">
+        <ul class="menu">
+            
+            <li class="menu-item">
+                <a href="/" class="menu-item-link">Home</a>
+            </li>
+            
+            <li class="menu-item">
+                <a href="/archives" class="menu-item-link">Archives</a>
+            </li>
+            
+            <li class="menu-item">
+                <a href="/categories" class="menu-item-link">Categories</a>
+            </li>
+            
+            <li class="menu-item">
+                <a href="/about" class="menu-item-link">About</a>
+            </li>
+            
+        </ul>
+    </nav>
+</header>
+      <article class="post">
+          <div class="post-title">
+            <h2 class="title">Scalar diffraction python tutorial</h2>
+          </div>
+          <div class="post-meta">
+            <span class="post-time">2023-05-13</span>
+          </div>
+          <div class="post-content"><h2 id="Introduction">Introduction</h2>
+<p>本文的目的总结一些标量衍射的计算方法，并讨论讨论他们的适用条件。代码和例子在：<a target="_blank" rel="noopener" href="https://github.com/sleepingcat42/Scalardiffraction">https://github.com/sleepingcat42/Scalardiffraction</a></p>
+<p>需要的预备知识：涉及的数理知识并不高深，主要是线性系统和傅里叶变换（离散傅里叶变换）的基础知识，当然还有光学。</p>
+<p>涉及的内容：准确地说，应该是讨论基于快速傅里叶变换（FFT）的标量衍射，主要是常见的几种衍射计算方法</p>
+<ul>
+<li>瑞利-索末菲/角谱衍射</li>
+<li>菲涅尔衍射(Fres-TF 和 Fres-IR)</li>
+</ul>
+<p>其他衍射计算方法（待补充）</p>
+<ul>
+<li>单步菲涅尔衍射</li>
+<li>两步菲涅尔衍射</li>
+<li>夫琅禾费衍射</li>
+<li>其他（未来补充）</li>
+</ul>
+<p>本文的重点并不在标量衍射的推导，所以跳过麦克斯韦方程组，和参考文献[<a href="#ref2">2</a>] 类似，直接到跳到第一类瑞利-索末菲积分</p>
+<p>$$<br>
+U_2(x, y)=\frac{1}{j \lambda} \iint_{\Sigma} U_1(\xi, \eta) \frac{z}{r_{12}} \frac{\exp \left(j k r_{12}\right)}{r_{12}} d \xi d \eta<br>
+$$</p>
+<p>$\lambda$ 表示波长，$k=2\pi$ $(x, y)$ 和 $(\xi, \eta)$ 分别是入射屏面和观察平面的 坐标，$U_1$ 和 $U_2$ 分别是入射面和出射面的复振幅分布。<br>
+$\Sigma$ 为衍射孔径， $z$ 是两个平面的距离，$ r_{12}=\sqrt{z^2+(x-\xi)^2+(y-\eta)^2} $ 。</p>
+<p><img src="/2023/05/13/scalar-diffraction/fig1.png" alt="Alt text"></p>
+<p>当然，我们可以直接计算这个积分。假设采样数为 $N\times N$，这个积分的计算复杂度为$ \mathcal{O}(N^4）$。而基于 FFT 的算法时间复杂度可以降到 $ \mathcal{O}(N^2\log{N}) $，假如 $ N=1024 $ 时，基于 FFT 算法需要的时间是 1分钟，那么积分方法可能要算上一整天。接下来进入正题。</p>
+<h2 id="瑞利-索末菲-角谱衍射">瑞利-索末菲/角谱衍射</h2>
+<p>积分公式可以改写成卷积的形式</p>
+<p>$$<br>
+U_2(x, y)=\iint U_1(\xi, \eta) h(x-\xi, y-\eta) d \xi d \eta,<br>
+$$</p>
+<p>其中</p>
+<p>$$<br>
+h(x, y)=\frac{z}{j \lambda} \frac{\exp (j k r)}{r^2}<br>
+$$</p>
+<p>为 R-S 积分的冲激响应（impulse response）</p>
+<p>可以证明 R-S 积分传递函数（transfer function）的函数为<br>
+$$<br>
+H\left(f_X, f_Y\right)=\exp \left(j k z \sqrt{1-\left(\lambda f_X\right)^2-\left(\lambda f_Y\right)^2}\right)<br>
+$$<br>
+$f_X$, $f_Y$ 分别是$X$， $Y$方向的空间频率。这个函数即熟知的角谱（Angular Spectrum）传递函数。显然， $h(x, y)$ 和 $H(f_X, f_Y)$ 是傅里叶变换对。不过，两者之间的关系证明没有那么明显，证明过程可以参考[<a href="#ref2">3</a>]。</p>
+<p>这样，就有两种方法去计算：第一种是基于冲击响应的卷积方法</p>
+<p>$$<br>
+U_2(x, y)=\mathfrak{F}^{-1}\left{\mathfrak{I}\left{U_1(x, y)\right} \mathfrak{F}{h(x, y)}\right}<br>
+$$</p>
+<p>另一种是基于传递函数的方法</p>
+<p>$$<br>
+U_2(x, y)=\mathfrak{F}^{-1}\left{\mathfrak{F}\left{U_1(x, y)\right} H\left(f_X, f_Y\right)\right}<br>
+$$</p>
+<p>$\mathfrak{F}$ 和 $\mathfrak{F}^{-1}$ 为傅里叶变换和逆傅里叶变换。这两种方法在数学上是等价的，但实际计算中，对光场进行离散采样，采样的频率是有限的，应用 FFT 计算的时候就会遇到问题。</p>
+<h3 id="瑞利-索末菲衍射的条件">瑞利-索末菲衍射的条件</h3>
+<h4 id="冲激响应的采样条件">冲激响应的采样条件</h4>
+<p>假设对光场的离散采样如下图所示，$X$, $Y$ 的长度分别是 $L_X$,  $L_Y$，范围为 $\left[ -\frac{1}{2}L_X, \frac{1}{2}L_X\right]$   $\left[ -\frac{1}{2}L_Y, \frac{1}{2}L_Y\right]$，采样间隔为 $\Delta x$ 和 $\Delta y$ ，采样数  $ N_x = \frac{L_X}{\Delta x}$ ，$N_y = \frac{L_y}{\Delta y}$ 。后续的讨论遵循这里的采样设置。</p>
+<p><img src="/2023/05/13/scalar-diffraction/fig2.png" alt="Alt text"></p>
+<p>为了简化讨论，考虑一维的情形，对于</p>
+<p>$$<br>
+h(x)=\frac{z}{j \lambda} \frac{\exp (j k r)}{r^2} = \frac{z}{j \lambda} \frac{\exp (j \phi_h(x))}{r^2}<br>
+$$</p>
+<p>其中<br>
+$$<br>
+\phi_h = k \sqrt{z^2+x^2}<br>
+$$</p>
+<p>其局域空间频率应小于奈奎斯特采样频率<br>
+$$<br>
+\left| \frac{1}{2 \pi} \frac{\partial \phi_h}{\partial x}  \right|_{max} \leq \frac{1}{2 \Delta x}<br>
+$$</p>
+<p>即<br>
+$$<br>
+\left| \frac{x}{\lambda\sqrt{z^2 + x^2}}\right|_{max} \leq \frac{1}{2 \Delta x}<br>
+$$</p>
+<p>整理得到</p>
+<p>$$<br>
+z \geq \frac{ 2x_{max}\Delta x}{\lambda} \sqrt{1- \left(\frac{\lambda}{2\Delta x}\right)^2}<br>
+$$</p>
+<p>$x$ 的最大值为 $x_{max} = \frac{L}{2}$，且 $L_X = N_x \Delta x$ 上式可以改为<br>
+$$<br>
+z \geq \frac{ L_X \Delta x}{\lambda} \sqrt{1- \left(\frac{\lambda}{2\Delta x}\right)^2} = \frac{ N_x \Delta x^2}{\lambda} \sqrt{1- \left(\frac{\lambda}{2\Delta x}\right)^2}<br>
+$$</p>
+<p>上式并不适合衍射距离确定的采样讨论，当距离一定，整理上式得到采样间隔 $\Delta x$ 应该满足的条件<br>
+$$<br>
+\Delta x \leq \frac{\lambda z}{ L} \sqrt{1+ \left( \frac{L}{2z}\right)^2}<br>
+$$</p>
+<h4 id="角谱衍射函数的采样条件">角谱衍射函数的采样条件</h4>
+<p>$$<br>
+H\left(f_X\right)=\exp \left(j k z \sqrt{1-\left(\lambda f_X\right)^2}\right) = \exp \left(j \phi_H(f_X)\right)<br>
+$$<br>
+其中 $ \phi_H(f_X) =  k z \sqrt{1-\left(\lambda f_X\right)^2}$ 应该满足以下采样条件<br>
+$$<br>
+\left|\frac{1}{2 \pi} \frac{\partial \phi_H\left(f_X\right)}{\partial f_X}\right|<em>{\max } \leq \frac{1}{2 \Delta f_X},<br>
+$$<br>
+得到<br>
+$$<br>
+\left|\frac{z \lambda f_X}{\sqrt{1 - \left( \lambda f_X\right)^2}} \right|</em>{\max } \leq \frac{1}{2 \Delta f_X},<br>
+$$<br>
+式子左边是增函数，当 $f_X$ 取得最大值时，${f_X}<em>{max} = \frac{1}{2 \Delta x}$，$\Delta f_X = \frac{1}{L}$，代入上式得到采样条件<br>
+$$<br>
+z \leq \frac{ 2x</em>{max}\Delta x}{\lambda} \sqrt{1- \left(\frac{\lambda}{2\Delta x}\right)^2}<br>
+$$</p>
+<p>刚好与冲激响应函数相反，同样在衍射距离 $z$ 确定的情况下，可以得到采样间隔隔 $\Delta x$ 应该满足的条件<br>
+$$<br>
+\Delta x \geq \frac{\lambda z}{ L} \sqrt{1+ \left( \frac{L}{2z}\right)^2}<br>
+$$</p>
+<h2 id="傍轴近似：菲涅尔衍射">傍轴近似：菲涅尔衍射</h2>
+<p>再次回到 R-S 积分<br>
+$$<br>
+U_2(x, y)=\frac{1}{j \lambda} \iint_{\Sigma} U_1(\xi, \eta) \frac{z}{r_{12}} \frac{\exp \left(j k r_{12}\right)}{r_{12}} d \xi d \eta<br>
+$$</p>
+<p>在旁轴近似条件, 衍射角很小， $z \gg L$，倾斜因子 $K(\theta) = \frac{z}{r_{12}} \approx 1 $，对 $r_{12}$ 进行泰勒展开</p>
+<p>$$ r_{12}=\sqrt{z^2+(x-\xi)^2+(y-\eta)^2} \approx z\left[1+\frac{1}{2}\left(\frac{x-\xi}{z}\right)^2+\frac{1}{2}\left(\frac{y-\eta}{z}\right)^2\right] $$</p>
+<p>最后得到菲涅尔衍射的冲激响应<br>
+$$<br>
+h(x, y) = \frac{1}{j\lambda z}\exp(jkz) \exp(\left[\frac{jk}{2z}\left(x^2+y^2\right)\right]<br>
+$$<br>
+传递函数，也就是上式的里叶变换<br>
+$$<br>
+H(f_{X},f_{Y}) =\exp(j k z)\exp\left[ -j\pi\lambda z\left( {f_X}^2 + {f_Y}^2\right)\right]<br>
+$$</p>
+<p>其采样条件可以利用上一节得到的结果在傍轴近似下得到，对于冲激响应 h，当 $z \gg L$<br>
+$$<br>
+\Delta x \leq \frac{\lambda z}{ L} \sqrt{1+ \left( \frac{L}{2z}\right)^2} \approx \frac{\lambda z}{ L}<br>
+$$</p>
+<p>传播距离 $z$ 应满足</p>
+<p>$$<br>
+z \geq \frac{ L_X \Delta x}{\lambda}<br>
+$$</p>
+<p>对于传递函数 H</p>
+<p>$$<br>
+\Delta x \geq \frac{\lambda z}{L}<br>
+$$</p>
+<p>$$<br>
+z \leq \frac{ L_X \Delta x}{\lambda}<br>
+$$</p>
+<h2 id="代码实现和计算实例">代码实现和计算实例</h2>
+<p>仿真参数设置下图代码段所示，可以计算出在 $z=2000$ mm 处，两者采均满足采样条件，$z &gt;2000$ mm ，则利用传递函数计算会产生偏差，反之，冲激响应函数方法会产生误差。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np </span><br><span class="line"><span class="keyword">from</span> scalardifflib <span class="keyword">import</span> propagation_tf, propagation_ir</span><br><span class="line"><span class="keyword">from</span> mathfunc <span class="keyword">import</span> circ</span><br><span class="line"><span class="keyword">from</span> matplotlib <span class="keyword">import</span> pyplot <span class="keyword">as</span> plt</span><br><span class="line"></span><br><span class="line"><span class="comment"># unit mm</span></span><br><span class="line">L = <span class="number">0.5</span>                                 <span class="comment"># length Lx </span></span><br><span class="line">Nx = <span class="number">256</span>                                <span class="comment"># sample numbers</span></span><br><span class="line">dx = L/Nx                               <span class="comment"># sample interval delta x</span></span><br><span class="line">wavelen = <span class="number">0.5e-6</span>                        <span class="comment"># wavelength</span></span><br><span class="line">r = <span class="number">0.05</span>                                <span class="comment"># radius of the circle aperture </span></span><br><span class="line"></span><br><span class="line">x = np.linspace(-L/<span class="number">2</span>, L/<span class="number">2</span>-L/Nx, Nx)</span><br><span class="line">x, y = np.meshgrid(x, x)</span><br><span class="line">u1 = circ((x**<span class="number">2</span>+y**<span class="number">2</span>)/r**<span class="number">2</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">kernels = [<span class="string">&#x27;AS&#x27;</span>, <span class="string">&#x27;Fresnel&#x27;</span> ] </span><br><span class="line">methods = [<span class="string">&#x27;TF&#x27;</span>, <span class="string">&#x27;IR&#x27;</span>]</span><br><span class="line">z = [<span class="number">1000</span>,<span class="number">2000</span>,<span class="number">4000</span>,<span class="number">20000</span>]</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&#x27; zc = &#x27;</span>,<span class="built_in">str</span>(L*dx/wavelen), <span class="string">&#x27;mm&#x27;</span>)</span><br><span class="line"></span><br><span class="line">propagationfunc = <span class="keyword">lambda</span> kernel, method, z: propagation_tf(u1, L, wavelen,z,kernel) <span class="keyword">if</span> method ==<span class="string">&#x27;TF&#x27;</span> <span class="keyword">else</span> propagation_ir(u1, L, wavelen,z,kernel)  </span><br><span class="line">plt.figure(figsize=(<span class="number">8</span>, <span class="number">8</span>), dpi=<span class="number">300</span>)</span><br><span class="line">figindx = <span class="number">1</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(z)):</span><br><span class="line">    <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(kernels)):</span><br><span class="line">        <span class="keyword">for</span> k <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(methods)):</span><br><span class="line">            u2 = propagationfunc(kernels[k], methods[j], z[i])</span><br><span class="line">            plt.subplot(<span class="number">4</span>,<span class="number">4</span>,figindx)</span><br><span class="line">            plt.imshow(np.<span class="built_in">abs</span>(u2)**<span class="number">2</span>, <span class="string">&#x27;gnuplot&#x27;</span>)</span><br><span class="line">            <span class="keyword">if</span> (figindx-<span class="number">1</span>) % <span class="number">4</span> ==<span class="number">0</span> :</span><br><span class="line">                plt.ylabel(<span class="string">&#x27;z = &#x27;</span>+<span class="built_in">str</span>(z[i]))</span><br><span class="line">            <span class="keyword">if</span> figindx &lt;= <span class="number">4</span> :</span><br><span class="line">                plt.title(kernels[k]+<span class="string">&#x27;-&#x27;</span>+methods[j])</span><br><span class="line">            plt.xticks([])</span><br><span class="line">            plt.yticks([])</span><br><span class="line">            figindx = figindx+<span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p><img src="/2023/05/13/scalar-diffraction/fig3.png" alt="Alt text"></p>
+<h2 id="总结">总结</h2>
+<p>借用文献的一张图，这四种衍射计算方法的使用范围<br>
+<img src="/2023/05/13/scalar-diffraction/fig4.png" alt="Alt text"></p>
+<h2 id="参考文献-推荐阅读">参考文献/推荐阅读</h2>
+<ol>
+<li>
+<p name="ref1">Goodman, Joseph W. Introduction to Fourier optics. Roberts and Company publishers, 2005.</p>
+</li>
+<li>
+<p name="ref2">Voelz, David George. Computational fourier optics: a MATLAB tutorial. Vol. 534. Bellingham, Washington: SPIE press, 2011.</p>
+</li>
+<li>
+<p name="ref2">Ersoy, Okan K. Diffraction, Fourier optics and imaging. John Wiley & Sons, 2006..</p>
+</li>
+<li>
+<p name="ref2">Zhang, Wenhui, et al. "Analysis of numerical diffraction calculation methods: from the perspective of phase space optics and the sampling theorem." JOSA A 37.11 (2020): 1748-1766.</p>
+</li>
+</ol>
+</div>
+        </article>
+        
+        <script src="https://giscus.app/client.js"
+          data-repo=  aeilot/en
+          data-repo-id="MDEwOlJlcG9zaXRvcnkzNTIwMzg4MTk="
+          data-category="General"
+          data-category-id="DIC_kwDOFPuvo84COOf2"
+          data-mapping="pathname"
+          data-reactions-enabled="1"
+          data-emit-metadata="0"
+          data-input-position="top"
+          data-theme="light"
+          data-lang="en"
+          data-loading="lazy"
+          crossorigin="anonymous"
+          async>
+        </script>
+        
+        <!-- <p class="footer">Made with ♥︎ by Sleepingcat</p> -->
+      </main>
+  </body>
+</html>
