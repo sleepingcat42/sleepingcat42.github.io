@@ -84,7 +84,7 @@ iframe {
 figure {
   display: block;
   margin-block-start: 1em;
-  margin-block-end: 1em;
+  margin-block-end: 0em;
   margin-inline-start: 40px;
   margin-inline-end: 40px;
 }
@@ -100,6 +100,15 @@ figure {
   padding: 0 50px;
   max-width: calc(50em - 2 * 50px) !important;
   font-family: Georgia, 'Times New Roman', Times, serif !important;
+}
+header {
+  width: 90%;
+}
+.container .main-inner {
+  width: 90%;
+}
+.content-wrap {
+  width: calc(100% - 260px);
 }
 .header {
   display: block;
