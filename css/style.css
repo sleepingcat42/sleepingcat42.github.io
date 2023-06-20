@@ -84,7 +84,7 @@ iframe {
 figure {
   display: block;
   margin-block-start: 1em;
-  margin-block-end: 0em;
+  margin-block-end: 1em;
   margin-inline-start: 40px;
   margin-inline-end: 40px;
 }
